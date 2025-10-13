@@ -1,3 +1,21 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  background-color: #f8f8f8;
+  margin-top: 40px;
+}
+
+h1 {
+  margin-bottom: 20px;
+  color: #00449f;
+}
+
+canvas {
+  border: 1px solid black;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
 .icon {
   width: 64px;
   vertical-align: top;
