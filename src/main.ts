@@ -24,18 +24,37 @@ const thickBtn = document.createElement("button");
 thickBtn.textContent = "Thick";
 document.body.appendChild(thickBtn);
 
-// Sticker tool buttons
-const smileBtn = document.createElement("button");
-smileBtn.textContent = "🔥";
-document.body.appendChild(smileBtn);
+// Data-driven sticker list
+const stickerSet: string[] = ["💎", "🔥", "⚡"];
 
-const heartBtn = document.createElement("button");
-heartBtn.textContent = "❤️";
-document.body.appendChild(heartBtn);
+// Container for sticker buttons
+const stickerContainer = document.createElement("div");
+document.body.appendChild(stickerContainer);
 
-const starBtn = document.createElement("button");
-starBtn.textContent = "⭐";
-document.body.appendChild(starBtn);
+// Helper to rebuild sticker buttons
+function renderStickers() {
+  stickerContainer.innerHTML = "";
+  for (const emoji of stickerSet) {
+    const btn = document.createElement("button");
+    btn.textContent = emoji;
+    btn.addEventListener("click", () => selectSticker(emoji, btn));
+    stickerContainer.appendChild(btn);
+  }
+
+  // Custom sticker button
+  const customBtn = document.createElement("button");
+  customBtn.textContent = "+";
+  customBtn.title = "Add custom sticker";
+  customBtn.addEventListener("click", () => {
+    const userEmoji = prompt("Enter a custom sticker", "🧩");
+    if (userEmoji && userEmoji.trim() !== "") {
+      stickerSet.push(userEmoji);
+      renderStickers(); // refresh sticker buttons
+      notifyToolMoved(); // update preview
+    }
+  });
+  stickerContainer.appendChild(customBtn);
+}
 
 // Action buttons
 const undoBtn = document.createElement("button");
@@ -55,7 +74,7 @@ interface DisplayCommand {
   display(ctx: CanvasRenderingContext2D): void;
 }
 
-// MarkerLine command
+// Marker line
 class MarkerLine implements DisplayCommand {
   private points: { x: number; y: number }[];
   private thickness: number;
@@ -83,7 +102,7 @@ class MarkerLine implements DisplayCommand {
   }
 }
 
-// StickerCommand for placing stickers
+// Sticker command
 class StickerCommand implements DisplayCommand {
   private emoji: string;
   private x: number;
@@ -108,7 +127,7 @@ class StickerCommand implements DisplayCommand {
   }
 }
 
-// Tool preview for markers or stickers
+// Tool preview (works for markers or stickers)
 class ToolPreview implements DisplayCommand {
   private x: number;
   private y: number;
@@ -141,7 +160,7 @@ class ToolPreview implements DisplayCommand {
       ctx.globalAlpha = 1.0;
     } else {
       ctx.beginPath();
-      ctx.strokeStyle = "gray";
+      ctx.strokeStyle = "black";
       ctx.lineWidth = 1;
       ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
       ctx.stroke();
@@ -154,14 +173,10 @@ let drawing: DisplayCommand[] = [];
 let redoStack: DisplayCommand[] = [];
 let currentLine: MarkerLine | null = null;
 let currentSticker: StickerCommand | null = null;
-
-// Tool preview
 let toolPreview: ToolPreview | null = null;
 
-// Drawing state
+// State
 let isDrawing = false;
-
-// Current tool
 let currentTool: "marker" | "sticker" = "marker";
 let currentThickness = 2;
 let currentEmoji: string | null = null;
@@ -178,7 +193,7 @@ function selectSticker(emoji: string, button: HTMLButtonElement) {
   currentTool = "sticker";
   currentEmoji = emoji;
   updateSelectedTool(button);
-  notifyToolMoved(); // refresh preview display
+  notifyToolMoved();
 }
 
 function updateSelectedTool(selected: HTMLButtonElement) {
@@ -197,8 +212,6 @@ function redraw() {
   for (const command of drawing) {
     command.display(ctx);
   }
-
-  // Preview
   if (!isDrawing && toolPreview) {
     toolPreview.display(ctx);
   }
@@ -214,16 +227,14 @@ canvas.addEventListener(TOOL_MOVED, redraw);
 
 // Event dispatchers
 function notifyDrawingChanged() {
-  const event = new Event(DRAWING_CHANGED);
-  canvas.dispatchEvent(event);
+  canvas.dispatchEvent(new Event(DRAWING_CHANGED));
 }
 
 function notifyToolMoved() {
-  const event = new Event(TOOL_MOVED);
-  canvas.dispatchEvent(event);
+  canvas.dispatchEvent(new Event(TOOL_MOVED));
 }
 
-// Mouse events
+// Mouse logic
 canvas.addEventListener("mousedown", (e) => {
   isDrawing = true;
   const rect = canvas.getBoundingClientRect();
@@ -248,14 +259,12 @@ canvas.addEventListener("mousemove", (e) => {
   const y = e.clientY - rect.top;
 
   if (isDrawing) {
-    if (currentTool === "marker" && currentLine) {
-      currentLine.drag(x, y);
-    } else if (currentTool === "sticker" && currentSticker) {
+    if (currentTool === "marker" && currentLine) currentLine.drag(x, y);
+    else if (currentTool === "sticker" && currentSticker) {
       currentSticker.drag(x, y);
     }
     notifyDrawingChanged();
   } else {
-    // Update preview
     if (!toolPreview) {
       toolPreview = new ToolPreview(x, y, currentThickness, currentEmoji);
     } else {
@@ -280,23 +289,19 @@ canvas.addEventListener("mouseleave", () => {
   notifyToolMoved();
 });
 
-// Undo button
+// Undo / Redo / Clear
 undoBtn.addEventListener("click", () => {
   if (drawing.length === 0) return;
-  const undone = drawing.pop()!;
-  redoStack.push(undone);
+  redoStack.push(drawing.pop()!);
   notifyDrawingChanged();
 });
 
-// Redo button
 redoBtn.addEventListener("click", () => {
   if (redoStack.length === 0) return;
-  const redone = redoStack.pop()!;
-  drawing.push(redone);
+  drawing.push(redoStack.pop()!);
   notifyDrawingChanged();
 });
 
-// Clear button
 clearBtn.addEventListener("click", () => {
   drawing = [];
   redoStack = [];
@@ -307,6 +312,5 @@ clearBtn.addEventListener("click", () => {
 thinBtn.addEventListener("click", () => selectMarker(2, thinBtn));
 thickBtn.addEventListener("click", () => selectMarker(6, thickBtn));
 
-smileBtn.addEventListener("click", () => selectSticker("🔥", smileBtn));
-heartBtn.addEventListener("click", () => selectSticker("❤️", heartBtn));
-starBtn.addEventListener("click", () => selectSticker("⭐", starBtn));
+// Render initial stickers
+renderStickers();
