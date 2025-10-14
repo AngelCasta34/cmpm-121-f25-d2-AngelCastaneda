@@ -52,12 +52,10 @@ class MarkerLine implements DisplayCommand {
     this.thickness = thickness;
   }
 
-  // Extend the line
   drag(x: number, y: number) {
     this.points.push({ x, y });
   }
 
-  // Draw itself
   display(ctx: CanvasRenderingContext2D) {
     if (this.points.length === 0) return;
     ctx.beginPath();
@@ -72,10 +70,39 @@ class MarkerLine implements DisplayCommand {
   }
 }
 
+// Class for tool preview
+class ToolPreview implements DisplayCommand {
+  private x: number;
+  private y: number;
+  private thickness: number;
+
+  constructor(x: number, y: number, thickness: number) {
+    this.x = x;
+    this.y = y;
+    this.thickness = thickness;
+  }
+
+  update(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    ctx.beginPath();
+    ctx.strokeStyle = "gray";
+    ctx.lineWidth = 1;
+    ctx.arc(this.x, this.y, this.thickness / 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 // Drawing data
 let drawing: DisplayCommand[] = [];
 let redoStack: DisplayCommand[] = [];
 let currentLine: MarkerLine | null = null;
+
+// Tool preview
+let toolPreview: ToolPreview | null = null;
 
 // Drawing state
 let isDrawing = false;
@@ -91,26 +118,38 @@ function selectTool(thickness: number, button: HTMLButtonElement) {
   button.classList.add("selectedTool");
 }
 
-// Default tool is thin
+// Default tool
 selectTool(2, thinBtn);
 
-// Redraw everything when drawing changes
+// Redraw everything when drawing changes or tool moves
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const command of drawing) {
     command.display(ctx);
   }
+
+  // Draw preview only when not drawing
+  if (!isDrawing && toolPreview) {
+    toolPreview.display(ctx);
+  }
 }
 
-// Custom event name
+// Custom event names
 const DRAWING_CHANGED = "drawing-changed";
+const TOOL_MOVED = "tool-moved";
 
-// Observer
+// Observers
 canvas.addEventListener(DRAWING_CHANGED, redraw);
+canvas.addEventListener(TOOL_MOVED, redraw);
 
 // Helper to notify observers
 function notifyDrawingChanged() {
   const event = new Event(DRAWING_CHANGED);
+  canvas.dispatchEvent(event);
+}
+
+function notifyToolMoved() {
+  const event = new Event(TOOL_MOVED);
   canvas.dispatchEvent(event);
 }
 
@@ -127,12 +166,22 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!isDrawing || !currentLine) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  currentLine.drag(x, y);
-  notifyDrawingChanged();
+
+  if (isDrawing && currentLine) {
+    currentLine.drag(x, y);
+    notifyDrawingChanged();
+  } else {
+    // Update tool preview when not drawing
+    if (!toolPreview) {
+      toolPreview = new ToolPreview(x, y, currentThickness);
+    } else {
+      toolPreview.update(x, y);
+    }
+    notifyToolMoved();
+  }
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -143,6 +192,8 @@ canvas.addEventListener("mouseup", () => {
 canvas.addEventListener("mouseleave", () => {
   isDrawing = false;
   currentLine = null;
+  toolPreview = null;
+  notifyToolMoved();
 });
 
 // Undo button handler
