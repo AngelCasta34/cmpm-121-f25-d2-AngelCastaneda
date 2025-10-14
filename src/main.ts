@@ -29,14 +29,42 @@ const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 document.body.appendChild(clearBtn);
 
-// Types
-type Point = { x: number; y: number };
-type Line = Point[];
+// Interface: anything that can display itself on a canvas
+interface DisplayCommand {
+  display(ctx: CanvasRenderingContext2D): void;
+}
+
+// Class representing one marker line
+class MarkerLine implements DisplayCommand {
+  private points: { x: number; y: number }[];
+
+  constructor(startX: number, startY: number) {
+    this.points = [{ x: startX, y: startY }];
+  }
+
+  // Extend the line
+  drag(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+
+  // Draw itself
+  display(ctx: CanvasRenderingContext2D) {
+    if (this.points.length === 0) return;
+    ctx.beginPath();
+    const first = this.points[0]!;
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < this.points.length; i++) {
+      const p = this.points[i]!;
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+  }
+}
 
 // Drawing data
-let drawing: Line[] = []; // main display list
-let redoStack: Line[] = []; // redo stack
-let currentLine: Line = [];
+let drawing: DisplayCommand[] = []; // main display list
+let redoStack: DisplayCommand[] = []; // redo stack
+let currentLine: MarkerLine | null = null;
 
 // Drawing state
 let isDrawing = false;
@@ -44,19 +72,9 @@ let isDrawing = false;
 // Redraw everything when drawing changes
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
-
-  for (const line of drawing) {
-    if (line.length === 0) continue;
-    const first = line[0]!;
-    ctx.moveTo(first.x, first.y);
-    for (let i = 1; i < line.length; i++) {
-      const point = line[i]!;
-      ctx.lineTo(point.x, point.y);
-    }
+  for (const command of drawing) {
+    command.display(ctx);
   }
-
-  ctx.stroke();
 }
 
 // Custom event name
@@ -77,27 +95,29 @@ canvas.addEventListener("mousedown", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  currentLine = [{ x, y }];
+  currentLine = new MarkerLine(x, y);
   drawing.push(currentLine);
-  redoStack = []; // clear redo history when new line starts
+  redoStack = []; // clear redo history when new drawing starts
   notifyDrawingChanged();
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!isDrawing) return;
+  if (!isDrawing || !currentLine) return;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  currentLine.push({ x, y });
+  currentLine.drag(x, y);
   notifyDrawingChanged();
 });
 
 canvas.addEventListener("mouseup", () => {
   isDrawing = false;
+  currentLine = null;
 });
 
 canvas.addEventListener("mouseleave", () => {
   isDrawing = false;
+  currentLine = null;
 });
 
 // Undo button handler
