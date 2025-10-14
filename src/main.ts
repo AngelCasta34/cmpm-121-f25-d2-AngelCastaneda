@@ -17,15 +17,15 @@ ctx.strokeStyle = "black";
 
 // Marker tool buttons
 const thinBtn = document.createElement("button");
-thinBtn.textContent = "Thin";
+thinBtn.textContent = "Fine Brush";
 document.body.appendChild(thinBtn);
 
 const thickBtn = document.createElement("button");
-thickBtn.textContent = "Thick";
+thickBtn.textContent = "Bold Brush";
 document.body.appendChild(thickBtn);
 
 // Data-driven sticker list
-const stickerSet: string[] = ["💎", "🔥", "⚡"];
+const stickerSet: string[] = ["💾", "🎮", "🧠"];
 const stickerContainer = document.createElement("div");
 document.body.appendChild(stickerContainer);
 
@@ -44,7 +44,7 @@ function renderStickers() {
   customBtn.textContent = "+";
   customBtn.title = "Add custom sticker";
   customBtn.addEventListener("click", () => {
-    const userEmoji = prompt("Enter a custom sticker", "🧩");
+    const userEmoji = prompt("Enter a custom sticker", "✨");
     if (userEmoji && userEmoji.trim() !== "") {
       stickerSet.push(userEmoji);
       renderStickers();
@@ -122,7 +122,7 @@ class StickerCommand implements DisplayCommand {
   }
 
   display(ctx: CanvasRenderingContext2D) {
-    ctx.font = "24px sans-serif";
+    ctx.font = "32px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(this.emoji, this.x, this.y);
@@ -302,7 +302,7 @@ clearBtn.addEventListener("click", () => {
 
 // Export button handler
 exportBtn.addEventListener("click", () => {
-  // Create high-resolution canvas (4× scale)
+  // Create high-resolution canvas
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = 1024;
   exportCanvas.height = 1024;
@@ -324,8 +324,8 @@ exportBtn.addEventListener("click", () => {
 });
 
 // Tool buttons
-thinBtn.addEventListener("click", () => selectMarker(2, thinBtn));
-thickBtn.addEventListener("click", () => selectMarker(6, thickBtn));
+thinBtn.addEventListener("click", () => selectMarker(3, thinBtn));
+thickBtn.addEventListener("click", () => selectMarker(10, thickBtn));
 
 // Render initial stickers
 renderStickers();
