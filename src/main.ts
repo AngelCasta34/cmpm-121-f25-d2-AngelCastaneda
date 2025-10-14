@@ -26,8 +26,6 @@ document.body.appendChild(thickBtn);
 
 // Data-driven sticker list
 const stickerSet: string[] = ["💎", "🔥", "⚡"];
-
-// Container for sticker buttons
 const stickerContainer = document.createElement("div");
 document.body.appendChild(stickerContainer);
 
@@ -49,8 +47,8 @@ function renderStickers() {
     const userEmoji = prompt("Enter a custom sticker", "🧩");
     if (userEmoji && userEmoji.trim() !== "") {
       stickerSet.push(userEmoji);
-      renderStickers(); // refresh sticker buttons
-      notifyToolMoved(); // update preview
+      renderStickers();
+      notifyToolMoved();
     }
   });
   stickerContainer.appendChild(customBtn);
@@ -69,7 +67,11 @@ const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 document.body.appendChild(clearBtn);
 
-// Interface: anything that can display itself on a canvas
+const exportBtn = document.createElement("button");
+exportBtn.textContent = "Export";
+document.body.appendChild(exportBtn);
+
+// Interface
 interface DisplayCommand {
   display(ctx: CanvasRenderingContext2D): void;
 }
@@ -127,7 +129,7 @@ class StickerCommand implements DisplayCommand {
   }
 }
 
-// Tool preview (works for markers or stickers)
+// Tool preview
 class ToolPreview implements DisplayCommand {
   private x: number;
   private y: number;
@@ -160,7 +162,7 @@ class ToolPreview implements DisplayCommand {
       ctx.globalAlpha = 1.0;
     } else {
       ctx.beginPath();
-      ctx.strokeStyle = "black";
+      ctx.strokeStyle = "gray";
       ctx.lineWidth = 1;
       ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
       ctx.stroke();
@@ -206,30 +208,23 @@ function updateSelectedTool(selected: HTMLButtonElement) {
 // Default tool
 selectMarker(2, thinBtn);
 
-// Redraw everything
+// Redraw
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const command of drawing) {
-    command.display(ctx);
-  }
-  if (!isDrawing && toolPreview) {
-    toolPreview.display(ctx);
-  }
+  for (const command of drawing) command.display(ctx);
+  if (!isDrawing && toolPreview) toolPreview.display(ctx);
 }
 
-// Custom event names
+// Custom events
 const DRAWING_CHANGED = "drawing-changed";
 const TOOL_MOVED = "tool-moved";
 
-// Observers
 canvas.addEventListener(DRAWING_CHANGED, redraw);
 canvas.addEventListener(TOOL_MOVED, redraw);
 
-// Event dispatchers
 function notifyDrawingChanged() {
   canvas.dispatchEvent(new Event(DRAWING_CHANGED));
 }
-
 function notifyToolMoved() {
   canvas.dispatchEvent(new Event(TOOL_MOVED));
 }
@@ -280,7 +275,6 @@ canvas.addEventListener("mouseup", () => {
   currentLine = null;
   currentSticker = null;
 });
-
 canvas.addEventListener("mouseleave", () => {
   isDrawing = false;
   currentLine = null;
@@ -295,20 +289,41 @@ undoBtn.addEventListener("click", () => {
   redoStack.push(drawing.pop()!);
   notifyDrawingChanged();
 });
-
 redoBtn.addEventListener("click", () => {
   if (redoStack.length === 0) return;
   drawing.push(redoStack.pop()!);
   notifyDrawingChanged();
 });
-
 clearBtn.addEventListener("click", () => {
   drawing = [];
   redoStack = [];
   notifyDrawingChanged();
 });
 
-// Tool button handlers
+// Export button handler
+exportBtn.addEventListener("click", () => {
+  // Create high-resolution canvas (4× scale)
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+  const exportCtx = exportCanvas.getContext("2d")!;
+  exportCtx.scale(4, 4); // upscale from 256 to 1024
+  exportCtx.lineCap = "round";
+  exportCtx.strokeStyle = "black";
+
+  // Redraw all drawing commands
+  for (const command of drawing) {
+    command.display(exportCtx);
+  }
+
+  // Download PNG
+  const anchor = document.createElement("a");
+  anchor.href = exportCanvas.toDataURL("image/png");
+  anchor.download = "sketchpad.png";
+  anchor.click();
+});
+
+// Tool buttons
 thinBtn.addEventListener("click", () => selectMarker(2, thinBtn));
 thickBtn.addEventListener("click", () => selectMarker(6, thickBtn));
 
