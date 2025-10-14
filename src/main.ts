@@ -16,7 +16,15 @@ ctx.lineWidth = 2;
 ctx.lineCap = "round";
 ctx.strokeStyle = "black";
 
-// Button
+// Buttons
+const undoBtn = document.createElement("button");
+undoBtn.textContent = "Undo";
+document.body.appendChild(undoBtn);
+
+const redoBtn = document.createElement("button");
+redoBtn.textContent = "Redo";
+document.body.appendChild(redoBtn);
+
 const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 document.body.appendChild(clearBtn);
@@ -26,7 +34,8 @@ type Point = { x: number; y: number };
 type Line = Point[];
 
 // Drawing data
-let drawing: Line[] = []; // List of lines
+let drawing: Line[] = []; // main display list
+let redoStack: Line[] = []; // redo stack
 let currentLine: Line = [];
 
 // Drawing state
@@ -38,11 +47,9 @@ function redraw() {
   ctx.beginPath();
 
   for (const line of drawing) {
-    if (line.length === 0) continue; // safety check
-
+    if (line.length === 0) continue;
     const first = line[0]!;
     ctx.moveTo(first.x, first.y);
-
     for (let i = 1; i < line.length; i++) {
       const point = line[i]!;
       ctx.lineTo(point.x, point.y);
@@ -52,9 +59,10 @@ function redraw() {
   ctx.stroke();
 }
 
+// Custom event name
 const DRAWING_CHANGED = "drawing-changed";
 
-// redraw when event fires
+// Observer
 canvas.addEventListener(DRAWING_CHANGED, redraw);
 
 // Helper to notify observers
@@ -71,6 +79,7 @@ canvas.addEventListener("mousedown", (e) => {
   const y = e.clientY - rect.top;
   currentLine = [{ x, y }];
   drawing.push(currentLine);
+  redoStack = []; // clear redo history when new line starts
   notifyDrawingChanged();
 });
 
@@ -91,8 +100,25 @@ canvas.addEventListener("mouseleave", () => {
   isDrawing = false;
 });
 
+// Undo button handler
+undoBtn.addEventListener("click", () => {
+  if (drawing.length === 0) return;
+  const undone = drawing.pop()!;
+  redoStack.push(undone);
+  notifyDrawingChanged();
+});
+
+// Redo button handler
+redoBtn.addEventListener("click", () => {
+  if (redoStack.length === 0) return;
+  const redone = redoStack.pop()!;
+  drawing.push(redone);
+  notifyDrawingChanged();
+});
+
 // Clear button handler
 clearBtn.addEventListener("click", () => {
   drawing = [];
+  redoStack = [];
   notifyDrawingChanged();
 });
