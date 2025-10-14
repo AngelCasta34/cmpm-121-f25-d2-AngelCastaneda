@@ -12,11 +12,19 @@ canvas.height = 256;
 canvas.id = "sketchCanvas";
 document.body.appendChild(canvas);
 const ctx = canvas.getContext("2d")!;
-ctx.lineWidth = 2;
 ctx.lineCap = "round";
 ctx.strokeStyle = "black";
 
-// Buttons
+// Tool buttons
+const thinBtn = document.createElement("button");
+thinBtn.textContent = "Thin";
+document.body.appendChild(thinBtn);
+
+const thickBtn = document.createElement("button");
+thickBtn.textContent = "Thick";
+document.body.appendChild(thickBtn);
+
+// Action buttons
 const undoBtn = document.createElement("button");
 undoBtn.textContent = "Undo";
 document.body.appendChild(undoBtn);
@@ -37,9 +45,11 @@ interface DisplayCommand {
 // Class representing one marker line
 class MarkerLine implements DisplayCommand {
   private points: { x: number; y: number }[];
+  private thickness: number;
 
-  constructor(startX: number, startY: number) {
+  constructor(startX: number, startY: number, thickness: number) {
     this.points = [{ x: startX, y: startY }];
+    this.thickness = thickness;
   }
 
   // Extend the line
@@ -52,6 +62,7 @@ class MarkerLine implements DisplayCommand {
     if (this.points.length === 0) return;
     ctx.beginPath();
     const first = this.points[0]!;
+    ctx.lineWidth = this.thickness;
     ctx.moveTo(first.x, first.y);
     for (let i = 1; i < this.points.length; i++) {
       const p = this.points[i]!;
@@ -62,12 +73,26 @@ class MarkerLine implements DisplayCommand {
 }
 
 // Drawing data
-let drawing: DisplayCommand[] = []; // main display list
-let redoStack: DisplayCommand[] = []; // redo stack
+let drawing: DisplayCommand[] = [];
+let redoStack: DisplayCommand[] = [];
 let currentLine: MarkerLine | null = null;
 
 // Drawing state
 let isDrawing = false;
+
+// Current tool style
+let currentThickness = 2;
+
+// Handle tool selection
+function selectTool(thickness: number, button: HTMLButtonElement) {
+  currentThickness = thickness;
+  thinBtn.classList.remove("selectedTool");
+  thickBtn.classList.remove("selectedTool");
+  button.classList.add("selectedTool");
+}
+
+// Default tool is thin
+selectTool(2, thinBtn);
 
 // Redraw everything when drawing changes
 function redraw() {
@@ -95,9 +120,9 @@ canvas.addEventListener("mousedown", (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  currentLine = new MarkerLine(x, y);
+  currentLine = new MarkerLine(x, y, currentThickness);
   drawing.push(currentLine);
-  redoStack = []; // clear redo history when new drawing starts
+  redoStack = [];
   notifyDrawingChanged();
 });
 
@@ -142,3 +167,7 @@ clearBtn.addEventListener("click", () => {
   redoStack = [];
   notifyDrawingChanged();
 });
+
+// Tool button handlers
+thinBtn.addEventListener("click", () => selectTool(2, thinBtn));
+thickBtn.addEventListener("click", () => selectTool(6, thickBtn));
