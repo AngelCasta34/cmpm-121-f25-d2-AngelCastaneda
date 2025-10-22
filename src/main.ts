@@ -13,7 +13,6 @@ canvas.id = "sketchCanvas";
 document.body.appendChild(canvas);
 const ctx = canvas.getContext("2d")!;
 ctx.lineCap = "round";
-ctx.strokeStyle = "black";
 
 // Marker tool buttons
 const thinBtn = document.createElement("button");
@@ -24,10 +23,22 @@ const thickBtn = document.createElement("button");
 thickBtn.textContent = "Bold Brush";
 document.body.appendChild(thickBtn);
 
-// Data-driven sticker list
+// Data driven sticker list
 const stickerSet: string[] = ["💾", "🎮", "🧠"];
 const stickerContainer = document.createElement("div");
 document.body.appendChild(stickerContainer);
+
+//Custom events moved
+const DRAWING_CHANGED = "drawing-changed";
+const TOOL_MOVED = "tool-moved";
+
+function notifyDrawingChanged() {
+  canvas.dispatchEvent(new Event(DRAWING_CHANGED));
+}
+
+function notifyToolMoved() {
+  canvas.dispatchEvent(new Event(TOOL_MOVED));
+}
 
 // Helper to rebuild sticker buttons
 function renderStickers() {
@@ -76,14 +87,30 @@ interface DisplayCommand {
   display(ctx: CanvasRenderingContext2D): void;
 }
 
+// Helpers for our Step 12
+function randomColor(): string {
+  const hue = Math.floor(Math.random() * 360);
+  return `hsl(${hue}, 90%, 45%)`;
+}
+function randomRotation(): number {
+  return Math.floor(Math.random() * 360);
+}
+
 // Marker line
 class MarkerLine implements DisplayCommand {
   private points: { x: number; y: number }[];
   private thickness: number;
+  private color: string;
 
-  constructor(startX: number, startY: number, thickness: number) {
+  constructor(
+    startX: number,
+    startY: number,
+    thickness: number,
+    color: string,
+  ) {
     this.points = [{ x: startX, y: startY }];
     this.thickness = thickness;
+    this.color = color;
   }
 
   drag(x: number, y: number) {
@@ -95,6 +122,7 @@ class MarkerLine implements DisplayCommand {
     ctx.beginPath();
     const first = this.points[0]!;
     ctx.lineWidth = this.thickness;
+    ctx.strokeStyle = this.color;
     ctx.moveTo(first.x, first.y);
     for (let i = 1; i < this.points.length; i++) {
       const p = this.points[i]!;
@@ -109,11 +137,13 @@ class StickerCommand implements DisplayCommand {
   private emoji: string;
   private x: number;
   private y: number;
+  private rotation: number;
 
-  constructor(emoji: string, x: number, y: number) {
+  constructor(emoji: string, x: number, y: number, rotation: number) {
     this.emoji = emoji;
     this.x = x;
     this.y = y;
+    this.rotation = rotation;
   }
 
   drag(x: number, y: number) {
@@ -122,10 +152,14 @@ class StickerCommand implements DisplayCommand {
   }
 
   display(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate((this.rotation * Math.PI) / 180);
     ctx.font = "32px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(this.emoji, this.x, this.y);
+    ctx.fillText(this.emoji, 0, 0);
+    ctx.restore();
   }
 }
 
@@ -154,16 +188,20 @@ class ToolPreview implements DisplayCommand {
 
   display(ctx: CanvasRenderingContext2D) {
     if (this.emoji) {
-      ctx.font = "24px sans-serif";
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate((currentRotation * Math.PI) / 180);
+      ctx.font = "32px sans-serif";
       ctx.globalAlpha = 0.6;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(this.emoji, this.x, this.y);
+      ctx.fillText(this.emoji, 0, 0);
+      ctx.restore();
       ctx.globalAlpha = 1.0;
     } else {
       ctx.beginPath();
-      ctx.strokeStyle = "gray";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = 2;
       ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
       ctx.stroke();
     }
@@ -180,20 +218,25 @@ let toolPreview: ToolPreview | null = null;
 // State
 let isDrawing = false;
 let currentTool: "marker" | "sticker" = "marker";
-let currentThickness = 2;
+let currentThickness = 3;
 let currentEmoji: string | null = null;
+let currentColor = randomColor();
+let currentRotation = randomRotation();
 
 // Tool selection
 function selectMarker(thickness: number, button: HTMLButtonElement) {
   currentTool = "marker";
   currentThickness = thickness;
   currentEmoji = null;
+  currentColor = randomColor();
   updateSelectedTool(button);
+  notifyToolMoved();
 }
 
 function selectSticker(emoji: string, button: HTMLButtonElement) {
   currentTool = "sticker";
   currentEmoji = emoji;
+  currentRotation = randomRotation();
   updateSelectedTool(button);
   notifyToolMoved();
 }
@@ -206,7 +249,7 @@ function updateSelectedTool(selected: HTMLButtonElement) {
 }
 
 // Default tool
-selectMarker(2, thinBtn);
+selectMarker(3, thinBtn);
 
 // Redraw
 function redraw() {
@@ -215,19 +258,8 @@ function redraw() {
   if (!isDrawing && toolPreview) toolPreview.display(ctx);
 }
 
-// Custom events
-const DRAWING_CHANGED = "drawing-changed";
-const TOOL_MOVED = "tool-moved";
-
 canvas.addEventListener(DRAWING_CHANGED, redraw);
 canvas.addEventListener(TOOL_MOVED, redraw);
-
-function notifyDrawingChanged() {
-  canvas.dispatchEvent(new Event(DRAWING_CHANGED));
-}
-function notifyToolMoved() {
-  canvas.dispatchEvent(new Event(TOOL_MOVED));
-}
 
 // Mouse logic
 canvas.addEventListener("mousedown", (e) => {
@@ -237,10 +269,10 @@ canvas.addEventListener("mousedown", (e) => {
   const y = e.clientY - rect.top;
 
   if (currentTool === "marker") {
-    currentLine = new MarkerLine(x, y, currentThickness);
+    currentLine = new MarkerLine(x, y, currentThickness, currentColor);
     drawing.push(currentLine);
   } else if (currentTool === "sticker" && currentEmoji) {
-    currentSticker = new StickerCommand(currentEmoji, x, y);
+    currentSticker = new StickerCommand(currentEmoji, x, y, currentRotation);
     drawing.push(currentSticker);
   }
 
@@ -302,21 +334,14 @@ clearBtn.addEventListener("click", () => {
 
 // Export button handler
 exportBtn.addEventListener("click", () => {
-  // Create high-resolution canvas
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = 1024;
   exportCanvas.height = 1024;
   const exportCtx = exportCanvas.getContext("2d")!;
-  exportCtx.scale(4, 4); // upscale from 256 to 1024
+  exportCtx.scale(4, 4);
   exportCtx.lineCap = "round";
-  exportCtx.strokeStyle = "black";
+  for (const command of drawing) command.display(exportCtx);
 
-  // Redraw all drawing commands
-  for (const command of drawing) {
-    command.display(exportCtx);
-  }
-
-  // Download PNG
   const anchor = document.createElement("a");
   anchor.href = exportCanvas.toDataURL("image/png");
   anchor.download = "sketchpad.png";
